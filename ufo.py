@@ -1,5 +1,6 @@
 import BeautifulSoup as BS
 
+
 ufo_cols = ['sighted_at', 'reported_at', 'location', 'shape', 'duration', 'description']
 zip_cols = ['zip', 'latitude', 'longitude', 'city', 'state', 'county', 'type']
 
@@ -42,6 +43,7 @@ def enhance_ufo_data():
     ufos = load_data('data/ufo_awesome.tsv', '\t', ufo_cols)
     zips = load_data('data/ZIP_CODES.txt', ',', zip_cols)
     fips, fips_dict = load_fips()
+    fad = load_fips_alpha()
 
     # index zip codes by city, state
     zip_dict = {}
@@ -79,6 +81,7 @@ def enhance_ufo_data():
             bad_ones.append(better)
         else:
             better['fips'] = fips_code
+            better['fips_alpha'] = fad[fips_code]
             with_counties.append(better)
 
     ma = open('data/ufo_more_awesome.tsv', 'w')
@@ -101,25 +104,28 @@ def color_map():
 
     path_style = 'font-size:12px;fill-rule:nonzero;stroke:#FFFFFF;stroke-opacity:1;stroke-width:0.1;stroke-miterlimit:4;stroke-dasharray:none;stroke-linecap:butt;marker-start:none;stroke-linejoin:bevel;fill:'
     
+    not_found = []
+    
     for p in paths:
  
         if p['id'] not in ["State_Lines", "separator"]:
-            # pass
             try:
                 num = sc[p['id']]
             except:
+                # County is not found, means there are
+                # no sitings there in our records
                 print "%s not found" % p['id']
                 continue
         
-            if num > 100:
+            if num > 500:
                 color_class = 5
-            elif num > 50:
+            elif num > 100:
                 color_class = 4
             elif num > 20:
                 color_class = 3
-            elif num > 10:
-                color_class = 2
             elif num > 5:
+                color_class = 2
+            elif num > 1:
                 color_class = 1
             else:
                 color_class = 0
@@ -131,13 +137,12 @@ def color_map():
     ufomap.write(soup.prettify())
     ufomap.close()
     
-    
 def sitings_by_county(ufodata):
     scount = {}
     for ufo in ufodata:
-        scount.setdefault(ufo['fips'], 0)
-        scount[ufo['fips']] += 1
-    return scount
+        scount.setdefault(ufo['fips_alpha'], 0)
+        scount[ufo['fips_alpha']] += 1
+    return scount 
 
 def findfips(uforec, fipdata):
     
@@ -162,3 +167,39 @@ def remove_parens(some_str):
 
     return good_str
     
+def clean_fips_alpha():
+    f = open('data/fips_alpha.csv', 'r')
+    o = open('data/fips_alpha_clean.csv', 'w')
+    fd = {}
+    fips = []
+    for line in f.readlines():
+        fip = [s.strip() for s in line.split(',')]
+        fip[1] = fip[1].replace(' ', '_')
+        o.write(','.join(fip) + '\n')
+    o.close()
+    f.close()
+    
+
+def load_fips_alpha():
+    f = open('data/fips_alpha_clean.csv', 'r')
+    fd = {}
+    for line in f.readlines():
+        record = line.split(',')
+        fd[record[0]] = record[1].strip('\n')
+
+    return fd
+
+def check_fips():
+    fips1, fd1 = load_fips()
+    fips2 = load_fips_alpha()
+    
+    not_found = []
+    found = []
+    for record in fips1:
+        try:
+            found.append(fips2[record['fips']])
+        except KeyError:
+            not_found.append(record)
+    return found, not_found
+
+
